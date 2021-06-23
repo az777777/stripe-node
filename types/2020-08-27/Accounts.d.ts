@@ -35,6 +35,8 @@ declare module 'stripe' {
 
       company?: Account.Company;
 
+      controller?: Account.Controller;
+
       /**
        * The account's country.
        */
@@ -58,7 +60,7 @@ declare module 'stripe' {
       details_submitted: boolean;
 
       /**
-       * The primary user's email address.
+       * An email address associated with the account. You can treat this as metadata: it is not used for authentication or messaging account holders.
        */
       email: string | null;
 
@@ -69,6 +71,9 @@ declare module 'stripe' {
 
       /**
        * This is an object representing a person associated with a Stripe account.
+       *
+       * A platform cannot access a Standard or Express account's persons after the account starts onboarding, such as after generating an account link for the account.
+       * See the [Standard onboarding](https://stripe.com/docs/connect/standard-accounts) or [Express onboarding documentation](https://stripe.com/docs/connect/express-accounts) for information about platform pre-filling and account onboarding steps.
        *
        * Related guide: [Handling Identity Verification with the API](https://stripe.com/docs/connect/identity-verification-api#person-information).
        */
@@ -149,6 +154,16 @@ declare module 'stripe' {
         | 'non_profit';
 
       interface Capabilities {
+        /**
+         * The status of the ACSS Direct Debits payments capability of the account, or whether the account can directly process ACSS Direct Debits charges.
+         */
+        acss_debit_payments?: Capabilities.AcssDebitPayments;
+
+        /**
+         * The status of the Afterpay Clearpay capability of the account, or whether the account can directly process Afterpay Clearpay charges.
+         */
+        afterpay_clearpay_payments?: Capabilities.AfterpayClearpayPayments;
+
         /**
          * The status of the BECS Direct Debit (AU) payments capability of the account, or whether the account can directly process BECS Direct Debit (AU) charges.
          */
@@ -251,6 +266,10 @@ declare module 'stripe' {
       }
 
       namespace Capabilities {
+        type AcssDebitPayments = 'active' | 'inactive' | 'pending';
+
+        type AfterpayClearpayPayments = 'active' | 'inactive' | 'pending';
+
         type AuBecsDebitPayments = 'active' | 'inactive' | 'pending';
 
         type BacsDebitPayments = 'active' | 'inactive' | 'pending';
@@ -442,10 +461,13 @@ declare module 'stripe' {
         }
 
         type Structure =
+          | 'free_zone_establishment'
+          | 'free_zone_llc'
           | 'government_instrumentality'
           | 'governmental_unit'
           | 'incorporated_non_profit'
           | 'limited_liability_partnership'
+          | 'llc'
           | 'multi_member_llc'
           | 'private_company'
           | 'private_corporation'
@@ -453,6 +475,8 @@ declare module 'stripe' {
           | 'public_company'
           | 'public_corporation'
           | 'public_partnership'
+          | 'single_member_llc'
+          | 'sole_establishment'
           | 'sole_proprietorship'
           | 'tax_exempt_government_instrumentality'
           | 'unincorporated_association'
@@ -487,39 +511,55 @@ declare module 'stripe' {
         }
       }
 
+      interface Controller {
+        /**
+         * `true` if the Connect application retrieving the resource controls the account and can therefore exercise [platform controls](https://stripe.com/docs/connect/platform-controls-for-standard-accounts). Otherwise, this field is null.
+         */
+        is_controller?: boolean;
+
+        /**
+         * The controller type. Can be `application`, if a Connect application controls the account, or `account`, if the account controls itself.
+         */
+        type?: Controller.Type;
+      }
+
+      namespace Controller {
+        type Type = 'account' | 'application';
+      }
+
       interface Requirements {
         /**
-         * The date the fields in `currently_due` must be collected by to keep payouts enabled for the account. These fields might block payouts sooner if the next threshold is reached before these fields are collected.
+         * Date by which the fields in `currently_due` must be collected to keep the account enabled. These fields may disable the account sooner if the next threshold is reached before they are collected.
          */
         current_deadline: number | null;
 
         /**
-         * The fields that need to be collected to keep the account enabled. If not collected by the `current_deadline`, these fields appear in `past_due` as well, and the account is disabled.
+         * Fields that need to be collected to keep the account enabled. If not collected by `current_deadline`, these fields appear in `past_due` as well, and the account is disabled.
          */
         currently_due: Array<string> | null;
 
         /**
-         * If the account is disabled, this string describes why the account can't create charges or receive payouts. Can be `requirements.past_due`, `requirements.pending_verification`, `rejected.fraud`, `rejected.terms_of_service`, `rejected.listed`, `rejected.other`, `listed`, `under_review`, or `other`.
+         * If the account is disabled, this string describes why. Can be `requirements.past_due`, `requirements.pending_verification`, `listed`, `platform_paused`, `rejected.fraud`, `rejected.listed`, `rejected.terms_of_service`, `rejected.other`, `under_review`, or `other`.
          */
         disabled_reason: string | null;
 
         /**
-         * The fields that are `currently_due` and need to be collected again because validation or verification failed for some reason.
+         * Fields that are `currently_due` and need to be collected again because validation or verification failed.
          */
         errors: Array<Requirements.Error> | null;
 
         /**
-         * The fields that need to be collected assuming all volume thresholds are reached. As they become required, these fields appear in `currently_due` as well, and the `current_deadline` is set.
+         * Fields that need to be collected assuming all volume thresholds are reached. As they become required, they appear in `currently_due` as well, and `current_deadline` becomes set.
          */
         eventually_due: Array<string> | null;
 
         /**
-         * The fields that weren't collected by the `current_deadline`. These fields need to be collected to re-enable the account.
+         * Fields that weren't collected by `current_deadline`. These fields need to be collected to enable the account.
          */
         past_due: Array<string> | null;
 
         /**
-         * Fields that may become required depending on the results of verification or review. An empty array unless an asynchronous verification is pending. If verification fails, the fields in this array become required and move to `currently_due` or `past_due`.
+         * Fields that may become required depending on the results of verification or review. Will be an empty array unless an asynchronous verification is pending. If verification fails, these fields move to `eventually_due`, `currently_due`, or `past_due`.
          */
         pending_verification: Array<string> | null;
       }
@@ -585,7 +625,10 @@ declare module 'stripe' {
             | 'verification_failed_name_match'
             | 'verification_failed_other'
             | 'verification_failed_tax_id_match'
-            | 'verification_failed_tax_id_not_issued';
+            | 'verification_failed_tax_id_not_issued'
+            | 'verification_missing_executives'
+            | 'verification_missing_owners'
+            | 'verification_requires_additional_memorandum_of_associations';
         }
       }
 
@@ -593,6 +636,8 @@ declare module 'stripe' {
         bacs_debit_payments?: Settings.BacsDebitPayments;
 
         branding: Settings.Branding;
+
+        card_issuing?: Settings.CardIssuing;
 
         card_payments: Settings.CardPayments;
 
@@ -633,6 +678,29 @@ declare module 'stripe' {
            * A CSS hex color value representing the secondary branding color for this account
            */
           secondary_color: string | null;
+        }
+
+        interface CardIssuing {
+          tos_acceptance?: CardIssuing.TosAcceptance;
+        }
+
+        namespace CardIssuing {
+          interface TosAcceptance {
+            /**
+             * The Unix timestamp marking when the account representative accepted the service agreement.
+             */
+            date: number | null;
+
+            /**
+             * The IP address from which the account representative accepted the service agreement.
+             */
+            ip: string | null;
+
+            /**
+             * The user agent of the browser from which the account representative accepted the service agreement.
+             */
+            user_agent?: string;
+          }
         }
 
         interface CardPayments {
@@ -834,7 +902,7 @@ declare module 'stripe' {
        *
        * By default, providing an external account sets it as the new default external account for its currency, and deletes the old default if one exists. To add additional external accounts without replacing the existing default for the currency, use the bank account or card creation API.
        */
-      external_account?: string;
+      external_account?: string | AccountCreateParams.ExternalAccount;
 
       /**
        * Information about the person represented by the account. This field is null unless `business_type` is set to `individual`.
@@ -897,7 +965,7 @@ declare module 'stripe' {
         /**
          * A publicly available website for handling support issues.
          */
-        support_url?: string;
+        support_url?: Stripe.Emptyable<string>;
 
         /**
          * The business's publicly available website.
@@ -946,6 +1014,16 @@ declare module 'stripe' {
         | 'non_profit';
 
       interface Capabilities {
+        /**
+         * The acss_debit_payments capability.
+         */
+        acss_debit_payments?: Capabilities.AcssDebitPayments;
+
+        /**
+         * The afterpay_clearpay_payments capability.
+         */
+        afterpay_clearpay_payments?: Capabilities.AfterpayClearpayPayments;
+
         /**
          * The au_becs_debit_payments capability.
          */
@@ -1048,6 +1126,20 @@ declare module 'stripe' {
       }
 
       namespace Capabilities {
+        interface AcssDebitPayments {
+          /**
+           * Passing true requests the capability for the account, if it is not already requested. A requested capability may not immediately become active. Any requirements to activate the capability are returned in the `requirements` arrays.
+           */
+          requested?: boolean;
+        }
+
+        interface AfterpayClearpayPayments {
+          /**
+           * Passing true requests the capability for the account, if it is not already requested. A requested capability may not immediately become active. Any requirements to activate the capability are returned in the `requirements` arrays.
+           */
+          requested?: boolean;
+        }
+
         interface AuBecsDebitPayments {
           /**
            * Passing true requests the capability for the account, if it is not already requested. A requested capability may not immediately become active. Any requirements to activate the capability are returned in the `requirements` arrays.
@@ -1305,10 +1397,13 @@ declare module 'stripe' {
         }
 
         type Structure =
+          | 'free_zone_establishment'
+          | 'free_zone_llc'
           | 'government_instrumentality'
           | 'governmental_unit'
           | 'incorporated_non_profit'
           | 'limited_liability_partnership'
+          | 'llc'
           | 'multi_member_llc'
           | 'private_company'
           | 'private_corporation'
@@ -1316,6 +1411,8 @@ declare module 'stripe' {
           | 'public_company'
           | 'public_corporation'
           | 'public_partnership'
+          | 'single_member_llc'
+          | 'sole_establishment'
           | 'sole_proprietorship'
           | 'tax_exempt_government_instrumentality'
           | 'unincorporated_association'
@@ -1417,6 +1514,43 @@ declare module 'stripe' {
            */
           files?: Array<string>;
         }
+      }
+
+      interface ExternalAccount {
+        /**
+         * The type of external account.
+         */
+        object: string;
+
+        /**
+         * The country in which the bank account is located.
+         */
+        country: string;
+
+        /**
+         * The currency the bank account is in. This must be a country/currency pairing that [Stripe supports](https://stripe.com/docs/payouts).
+         */
+        currency: string;
+
+        /**
+         * The name of the person or business that owns the bank account. This field is required when attaching the bank account to a Customer object.
+         */
+        account_holder_name?: string;
+
+        /**
+         * The type of entity that holds the account. This can be either individual or company. This field is required when attaching the bank account to a Customer object.
+         */
+        account_holder_type?: string;
+
+        /**
+         * The routing number, sort code, or other country-appropriate institution number for the bank account. For US bank accounts, this is required and should be the ACH routing number, not the wire routing number. If you are providing an IBAN for account_number, this field is not required.
+         */
+        routing_number?: string;
+
+        /**
+         * The account number for the bank account, in string form. Must be a checking account.
+         */
+        account_number: string;
       }
 
       interface Individual {
@@ -1614,6 +1748,11 @@ declare module 'stripe' {
         branding?: Settings.Branding;
 
         /**
+         * Settings specific to the account's use of the Card Issuing product.
+         */
+        card_issuing?: Settings.CardIssuing;
+
+        /**
          * Settings specific to card charging on the account.
          */
         card_payments?: Settings.CardPayments;
@@ -1650,6 +1789,32 @@ declare module 'stripe' {
            * A CSS hex color value representing the secondary branding color for this account.
            */
           secondary_color?: string;
+        }
+
+        interface CardIssuing {
+          /**
+           * Details on the account's acceptance of the [Stripe Issuing Terms and Disclosures](https://stripe.com/docs/issuing/connect/tos_acceptance).
+           */
+          tos_acceptance?: CardIssuing.TosAcceptance;
+        }
+
+        namespace CardIssuing {
+          interface TosAcceptance {
+            /**
+             * The Unix timestamp marking when the account representative accepted the service agreement.
+             */
+            date?: number;
+
+            /**
+             * The IP address from which the account representative accepted the service agreement.
+             */
+            ip?: string;
+
+            /**
+             * The user agent of the browser from which the account representative accepted the service agreement.
+             */
+            user_agent?: string;
+          }
         }
 
         interface CardPayments {
@@ -1898,7 +2063,7 @@ declare module 'stripe' {
         /**
          * A publicly available website for handling support issues.
          */
-        support_url?: string;
+        support_url?: Stripe.Emptyable<string>;
 
         /**
          * The business's publicly available website.
@@ -1947,6 +2112,16 @@ declare module 'stripe' {
         | 'non_profit';
 
       interface Capabilities {
+        /**
+         * The acss_debit_payments capability.
+         */
+        acss_debit_payments?: Capabilities.AcssDebitPayments;
+
+        /**
+         * The afterpay_clearpay_payments capability.
+         */
+        afterpay_clearpay_payments?: Capabilities.AfterpayClearpayPayments;
+
         /**
          * The au_becs_debit_payments capability.
          */
@@ -2049,6 +2224,20 @@ declare module 'stripe' {
       }
 
       namespace Capabilities {
+        interface AcssDebitPayments {
+          /**
+           * Passing true requests the capability for the account, if it is not already requested. A requested capability may not immediately become active. Any requirements to activate the capability are returned in the `requirements` arrays.
+           */
+          requested?: boolean;
+        }
+
+        interface AfterpayClearpayPayments {
+          /**
+           * Passing true requests the capability for the account, if it is not already requested. A requested capability may not immediately become active. Any requirements to activate the capability are returned in the `requirements` arrays.
+           */
+          requested?: boolean;
+        }
+
         interface AuBecsDebitPayments {
           /**
            * Passing true requests the capability for the account, if it is not already requested. A requested capability may not immediately become active. Any requirements to activate the capability are returned in the `requirements` arrays.
@@ -2306,10 +2495,13 @@ declare module 'stripe' {
         }
 
         type Structure =
+          | 'free_zone_establishment'
+          | 'free_zone_llc'
           | 'government_instrumentality'
           | 'governmental_unit'
           | 'incorporated_non_profit'
           | 'limited_liability_partnership'
+          | 'llc'
           | 'multi_member_llc'
           | 'private_company'
           | 'private_corporation'
@@ -2317,6 +2509,8 @@ declare module 'stripe' {
           | 'public_company'
           | 'public_corporation'
           | 'public_partnership'
+          | 'single_member_llc'
+          | 'sole_establishment'
           | 'sole_proprietorship'
           | 'tax_exempt_government_instrumentality'
           | 'unincorporated_association'
@@ -2615,6 +2809,11 @@ declare module 'stripe' {
         branding?: Settings.Branding;
 
         /**
+         * Settings specific to the account's use of the Card Issuing product.
+         */
+        card_issuing?: Settings.CardIssuing;
+
+        /**
          * Settings specific to card charging on the account.
          */
         card_payments?: Settings.CardPayments;
@@ -2651,6 +2850,32 @@ declare module 'stripe' {
            * A CSS hex color value representing the secondary branding color for this account.
            */
           secondary_color?: string;
+        }
+
+        interface CardIssuing {
+          /**
+           * Details on the account's acceptance of the [Stripe Issuing Terms and Disclosures](https://stripe.com/docs/issuing/connect/tos_acceptance).
+           */
+          tos_acceptance?: CardIssuing.TosAcceptance;
+        }
+
+        namespace CardIssuing {
+          interface TosAcceptance {
+            /**
+             * The Unix timestamp marking when the account representative accepted the service agreement.
+             */
+            date?: number;
+
+            /**
+             * The IP address from which the account representative accepted the service agreement.
+             */
+            ip?: string;
+
+            /**
+             * The user agent of the browser from which the account representative accepted the service agreement.
+             */
+            user_agent?: string;
+          }
         }
 
         interface CardPayments {
@@ -2835,7 +3060,7 @@ declare module 'stripe' {
       ): Promise<Stripe.Response<Stripe.Account>>;
 
       /**
-       * Updates a connected [Express or Custom account](https://stripe.com/docs/connect/accounts) by setting the values of the parameters passed. Any parameters not provided are left unchanged. Most parameters can be changed only for Custom accounts. (These are marked Custom Only below.) Parameters marked Custom and Express are supported by both account types.
+       * Updates a [connected account](https://stripe.com/docs/connect/accounts) by setting the values of the parameters passed. Any parameters not provided are left unchanged. Most parameters can be changed only for Custom accounts. (These are marked Custom Only below.) Parameters marked Custom and Express are not supported for Standard accounts.
        *
        * To update your own account, use the [Dashboard](https://dashboard.stripe.com/account). Refer to our [Connect](https://stripe.com/docs/connect/updating-accounts) documentation to learn more about updating accounts.
        */
@@ -2855,9 +3080,9 @@ declare module 'stripe' {
       list(options?: RequestOptions): ApiListPromise<Stripe.Account>;
 
       /**
-       * With [Connect](https://stripe.com/docs/connect), you can delete Custom or Express accounts you manage.
+       * With [Connect](https://stripe.com/docs/connect), you can delete accounts you manage.
        *
-       * Accounts created using test-mode keys can be deleted at any time. Accounts created using live-mode keys can only be deleted once all balances are zero.
+       * Accounts created using test-mode keys can be deleted at any time. Custom or Express accounts created using live-mode keys can only be deleted once all balances are zero.
        *
        * If you want to delete your own account, use the [account information tab in your account settings](https://dashboard.stripe.com/account) instead.
        */

@@ -14,6 +14,7 @@
 ///<reference path='./Balance.d.ts' />
 ///<reference path='./BalanceTransactions.d.ts' />
 ///<reference path='./BankAccounts.d.ts' />
+///<reference path='./BillingPortal/Configurations.d.ts' />
 ///<reference path='./BillingPortal/Sessions.d.ts' />
 ///<reference path='./BitcoinReceivers.d.ts' />
 ///<reference path='./BitcoinTransactions.d.ts' />
@@ -38,6 +39,8 @@
 ///<reference path='./FeeRefunds.d.ts' />
 ///<reference path='./FileLinks.d.ts' />
 ///<reference path='./Files.d.ts' />
+///<reference path='./Identity/VerificationReports.d.ts' />
+///<reference path='./Identity/VerificationSessions.d.ts' />
 ///<reference path='./InvoiceItems.d.ts' />
 ///<reference path='./InvoiceLineItems.d.ts' />
 ///<reference path='./Invoices.d.ts' />
@@ -82,6 +85,7 @@
 ///<reference path='./SubscriptionItems.d.ts' />
 ///<reference path='./SubscriptionSchedules.d.ts' />
 ///<reference path='./Subscriptions.d.ts' />
+///<reference path='./TaxCodes.d.ts' />
 ///<reference path='./TaxDeductedAtSources.d.ts' />
 ///<reference path='./TaxIds.d.ts' />
 ///<reference path='./TaxRates.d.ts' />
@@ -151,6 +155,7 @@ declare module 'stripe' {
     subscriptions: Stripe.SubscriptionsResource;
     subscriptionItems: Stripe.SubscriptionItemsResource;
     subscriptionSchedules: Stripe.SubscriptionSchedulesResource;
+    taxCodes: Stripe.TaxCodesResource;
     taxRates: Stripe.TaxRatesResource;
     tokens: Stripe.TokensResource;
     topups: Stripe.TopupsResource;
@@ -162,8 +167,15 @@ declare module 'stripe' {
     /**
      * Namespaced Resources
      */
-    billingPortal: {sessions: Stripe.BillingPortal.SessionsResource};
+    billingPortal: {
+      configurations: Stripe.BillingPortal.ConfigurationsResource;
+      sessions: Stripe.BillingPortal.SessionsResource;
+    };
     checkout: {sessions: Stripe.Checkout.SessionsResource};
+    identity: {
+      verificationReports: Stripe.Identity.VerificationReportsResource;
+      verificationSessions: Stripe.Identity.VerificationSessionsResource;
+    };
     issuing: {
       authorizations: Stripe.Issuing.AuthorizationsResource;
       cards: Stripe.Issuing.CardsResource;

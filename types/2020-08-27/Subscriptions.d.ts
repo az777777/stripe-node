@@ -21,6 +21,8 @@ declare module 'stripe' {
        */
       application_fee_percent: number | null;
 
+      automatic_tax: Subscription.AutomaticTax;
+
       /**
        * Determines the date of the first full invoice, and, for plans with `month` or `year` intervals, the day of the month for subsequent invoices.
        */
@@ -186,6 +188,13 @@ declare module 'stripe' {
     }
 
     namespace Subscription {
+      interface AutomaticTax {
+        /**
+         * Whether Stripe automatically computes tax on this subscription.
+         */
+        enabled: boolean;
+      }
+
       interface BillingThresholds {
         /**
          * Monetary threshold that triggers the subscription to create an invoice
@@ -288,7 +297,7 @@ declare module 'stripe' {
       customer: string;
 
       /**
-       * A list of prices and quantities that will generate invoice items appended to the first invoice for this subscription. You may pass up to 10 items.
+       * A list of prices and quantities that will generate invoice items appended to the first invoice for this subscription. You may pass up to 20 items.
        */
       add_invoice_items?: Array<SubscriptionCreateParams.AddInvoiceItem>;
 
@@ -296,6 +305,11 @@ declare module 'stripe' {
        * A non-negative decimal between 0 and 100, with at most two decimal places. This represents the percentage of the subscription invoice subtotal that will be transferred to the application owner's Stripe account. The request must be made by a platform account on a connected account in order to set an application fee percentage. For more information, see the application fees [documentation](https://stripe.com/docs/connect/subscriptions#collecting-fees-on-subscriptions).
        */
       application_fee_percent?: number;
+
+      /**
+       * Automatic tax settings for this subscription.
+       */
+      automatic_tax?: SubscriptionCreateParams.AutomaticTax;
 
       /**
        * For new subscriptions, a past timestamp to backdate the subscription's start date to. If set, the first invoice will contain a proration for the timespan between the start date and the current time. Can be combined with trials and the billing cycle anchor.
@@ -330,7 +344,7 @@ declare module 'stripe' {
       collection_method?: SubscriptionCreateParams.CollectionMethod;
 
       /**
-       * The code of the coupon to apply to this subscription. A coupon applied to a subscription will only affect invoices created for that particular subscription.
+       * The ID of the coupon to apply to this subscription. A coupon applied to a subscription will only affect invoices created for that particular subscription.
        */
       coupon?: string;
 
@@ -376,6 +390,8 @@ declare module 'stripe' {
 
       /**
        * Use `allow_incomplete` to create subscriptions with `status=incomplete` if the first invoice cannot be paid. Creating subscriptions with this status allows you to manage scenarios where additional user actions are needed to pay a subscription's invoice. For example, SCA regulation may require 3DS authentication to complete payment. See the [SCA Migration Guide](https://stripe.com/docs/billing/migration/strong-customer-authentication) for Billing to learn more. This is the default behavior.
+       *
+       * Use `default_incomplete` to create Subscriptions with `status=incomplete` when the first invoice requires payment, otherwise start as active. Subscriptions transition to `status=active` when successfully confirming the payment intent on the first invoice. This allows simpler management of scenarios where additional user actions are needed to pay a subscription's invoice. Such as failed payments, [SCA regulation](https://stripe.com/docs/billing/migration/strong-customer-authentication), or collecting a mandate for a bank debit payment method. If the payment intent is not confirmed within 23 hours subscriptions transition to `status=expired_incomplete`, which is a terminal state.
        *
        * Use `error_if_incomplete` if you want Stripe to return an HTTP 402 status code if a subscription's first invoice cannot be paid. For example, if a payment method requires 3DS authentication due to SCA regulation and further user action is needed, this parameter does not create a subscription and returns an error instead. This was the default behavior for API versions prior to 2019-03-14. See the [changelog](https://stripe.com/docs/upgrades#2019-03-14) to learn more.
        *
@@ -459,6 +475,11 @@ declare module 'stripe' {
           product: string;
 
           /**
+           * Specifies whether the price is considered inclusive of taxes or exclusive of taxes. One of `inclusive`, `exclusive`, or `unspecified`. Once specified as either `inclusive` or `exclusive`, it cannot be changed.
+           */
+          tax_behavior?: PriceData.TaxBehavior;
+
+          /**
            * A positive integer in %s (or 0 for a free price) representing how much to charge.
            */
           unit_amount?: number;
@@ -468,6 +489,17 @@ declare module 'stripe' {
            */
           unit_amount_decimal?: string;
         }
+
+        namespace PriceData {
+          type TaxBehavior = 'exclusive' | 'inclusive' | 'unspecified';
+        }
+      }
+
+      interface AutomaticTax {
+        /**
+         * Enabled automatic tax calculation which will automatically compute tax rates on all invoices generated by the subscription.
+         */
+        enabled: boolean;
       }
 
       interface BillingThresholds {
@@ -546,6 +578,11 @@ declare module 'stripe' {
           recurring: PriceData.Recurring;
 
           /**
+           * Specifies whether the price is considered inclusive of taxes or exclusive of taxes. One of `inclusive`, `exclusive`, or `unspecified`. Once specified as either `inclusive` or `exclusive`, it cannot be changed.
+           */
+          tax_behavior?: PriceData.TaxBehavior;
+
+          /**
            * A positive integer in %s (or 0 for a free price) representing how much to charge.
            */
           unit_amount?: number;
@@ -572,11 +609,14 @@ declare module 'stripe' {
           namespace Recurring {
             type Interval = 'day' | 'month' | 'week' | 'year';
           }
+
+          type TaxBehavior = 'exclusive' | 'inclusive' | 'unspecified';
         }
       }
 
       type PaymentBehavior =
         | 'allow_incomplete'
+        | 'default_incomplete'
         | 'error_if_incomplete'
         | 'pending_if_incomplete';
 
@@ -620,7 +660,7 @@ declare module 'stripe' {
 
     interface SubscriptionUpdateParams {
       /**
-       * A list of prices and quantities that will generate invoice items appended to the first invoice for this subscription. You may pass up to 10 items.
+       * A list of prices and quantities that will generate invoice items appended to the first invoice for this subscription. You may pass up to 20 items.
        */
       add_invoice_items?: Array<SubscriptionUpdateParams.AddInvoiceItem>;
 
@@ -628,6 +668,11 @@ declare module 'stripe' {
        * A non-negative decimal between 0 and 100, with at most two decimal places. This represents the percentage of the subscription invoice subtotal that will be transferred to the application owner's Stripe account. The request must be made by a platform account on a connected account in order to set an application fee percentage. For more information, see the application fees [documentation](https://stripe.com/docs/connect/subscriptions#collecting-fees-on-subscriptions).
        */
       application_fee_percent?: number;
+
+      /**
+       * Automatic tax settings for this subscription.
+       */
+      automatic_tax?: SubscriptionUpdateParams.AutomaticTax;
 
       /**
        * Either `now` or `unchanged`. Setting the value to `now` resets the subscription's billing cycle anchor to the current time. For more information, see the billing cycle [documentation](https://stripe.com/docs/billing/subscriptions/billing-cycle).
@@ -657,7 +702,7 @@ declare module 'stripe' {
       collection_method?: SubscriptionUpdateParams.CollectionMethod;
 
       /**
-       * The code of the coupon to apply to this subscription. A coupon applied to a subscription will only affect invoices created for that particular subscription.
+       * The ID of the coupon to apply to this subscription. A coupon applied to a subscription will only affect invoices created for that particular subscription.
        */
       coupon?: string;
 
@@ -710,6 +755,8 @@ declare module 'stripe' {
 
       /**
        * Use `allow_incomplete` to transition the subscription to `status=past_due` if a payment is required but cannot be paid. This allows you to manage scenarios where additional user actions are needed to pay a subscription's invoice. For example, SCA regulation may require 3DS authentication to complete payment. See the [SCA Migration Guide](https://stripe.com/docs/billing/migration/strong-customer-authentication) for Billing to learn more. This is the default behavior.
+       *
+       * Use `default_incomplete` to transition the subscription to `status=past_due` when payment is required and await explicit confirmation of the invoice's payment intent. This allows simpler management of scenarios where additional user actions are needed to pay a subscription's invoice. Such as failed payments, [SCA regulation](https://stripe.com/docs/billing/migration/strong-customer-authentication), or collecting a mandate for a bank debit payment method.
        *
        * Use `pending_if_incomplete` to update the subscription using [pending updates](https://stripe.com/docs/billing/subscriptions/pending-updates). When you use `pending_if_incomplete` you can only pass the parameters [supported by pending updates](https://stripe.com/docs/billing/pending-updates-reference#supported-attributes).
        *
@@ -795,6 +842,11 @@ declare module 'stripe' {
           product: string;
 
           /**
+           * Specifies whether the price is considered inclusive of taxes or exclusive of taxes. One of `inclusive`, `exclusive`, or `unspecified`. Once specified as either `inclusive` or `exclusive`, it cannot be changed.
+           */
+          tax_behavior?: PriceData.TaxBehavior;
+
+          /**
            * A positive integer in %s (or 0 for a free price) representing how much to charge.
            */
           unit_amount?: number;
@@ -804,6 +856,17 @@ declare module 'stripe' {
            */
           unit_amount_decimal?: string;
         }
+
+        namespace PriceData {
+          type TaxBehavior = 'exclusive' | 'inclusive' | 'unspecified';
+        }
+      }
+
+      interface AutomaticTax {
+        /**
+         * Enabled automatic tax calculation which will automatically compute tax rates on all invoices generated by the subscription.
+         */
+        enabled: boolean;
       }
 
       type BillingCycleAnchor = 'now' | 'unchanged';
@@ -899,6 +962,11 @@ declare module 'stripe' {
           recurring: PriceData.Recurring;
 
           /**
+           * Specifies whether the price is considered inclusive of taxes or exclusive of taxes. One of `inclusive`, `exclusive`, or `unspecified`. Once specified as either `inclusive` or `exclusive`, it cannot be changed.
+           */
+          tax_behavior?: PriceData.TaxBehavior;
+
+          /**
            * A positive integer in %s (or 0 for a free price) representing how much to charge.
            */
           unit_amount?: number;
@@ -925,6 +993,8 @@ declare module 'stripe' {
           namespace Recurring {
             type Interval = 'day' | 'month' | 'week' | 'year';
           }
+
+          type TaxBehavior = 'exclusive' | 'inclusive' | 'unspecified';
         }
       }
 
@@ -946,6 +1016,7 @@ declare module 'stripe' {
 
       type PaymentBehavior =
         | 'allow_incomplete'
+        | 'default_incomplete'
         | 'error_if_incomplete'
         | 'pending_if_incomplete';
 
@@ -1013,7 +1084,7 @@ declare module 'stripe' {
       price?: string;
 
       /**
-       * The status of the subscriptions to retrieve. Passing in a value of `canceled` will return all canceled subscriptions, including those belonging to deleted customers. Pass `ended` to find subscriptions that are canceled and subscriptions that are expired due to [incomplete payment](https://stripe.com/docs/billing/subscriptions/overview#subscription-statuses). Passing in a value of `all` will return subscriptions of all statuses.
+       * The status of the subscriptions to retrieve. Passing in a value of `canceled` will return all canceled subscriptions, including those belonging to deleted customers. Pass `ended` to find subscriptions that are canceled and subscriptions that are expired due to [incomplete payment](https://stripe.com/docs/billing/subscriptions/overview#subscription-statuses). Passing in a value of `all` will return subscriptions of all statuses. If no value is supplied, all subscriptions that have not been canceled are returned.
        */
       status?: SubscriptionListParams.Status;
     }

@@ -33,6 +33,8 @@ declare module 'stripe' {
          */
         amount_total: number | null;
 
+        automatic_tax: Session.AutomaticTax;
+
         /**
          * Describes whether Checkout should collect the customer's billing address.
          */
@@ -63,6 +65,11 @@ declare module 'stripe' {
          * the Session was created.
          */
         customer: string | Stripe.Customer | Stripe.DeletedCustomer | null;
+
+        /**
+         * The customer details including the customer's tax exempt status and the customer's tax IDs. Only present on Sessions in `payment` or `subscription` mode.
+         */
+        customer_details: Session.CustomerDetails | null;
 
         /**
          * If provided, this value will be used when the Customer object is created.
@@ -102,6 +109,11 @@ declare module 'stripe' {
          * The ID of the PaymentIntent for Checkout Sessions in `payment` mode.
          */
         payment_intent: string | Stripe.PaymentIntent | null;
+
+        /**
+         * Payment-method-specific configuration for the PaymentIntent or SetupIntent of this CheckoutSession.
+         */
+        payment_method_options: Session.PaymentMethodOptions | null;
 
         /**
          * A list of the types of payment methods (e.g. card) this Checkout
@@ -149,14 +161,112 @@ declare module 'stripe' {
          */
         success_url: string;
 
+        tax_id_collection?: Session.TaxIdCollection;
+
         /**
          * Tax and discount details for the computed total amount.
          */
         total_details: Session.TotalDetails | null;
+
+        /**
+         * The URL to the Checkout Session.
+         */
+        url: string | null;
       }
 
       namespace Session {
+        interface AutomaticTax {
+          /**
+           * Indicates whether automatic tax is enabled for the session
+           */
+          enabled: boolean;
+
+          /**
+           * The status of the most recent automated tax calculation for this session.
+           */
+          status: AutomaticTax.Status | null;
+        }
+
+        namespace AutomaticTax {
+          type Status = 'complete' | 'failed' | 'requires_location_inputs';
+        }
+
         type BillingAddressCollection = 'auto' | 'required';
+
+        interface CustomerDetails {
+          /**
+           * The customer's email at time of checkout.
+           */
+          email: string | null;
+
+          /**
+           * The customer's tax exempt status at time of checkout.
+           */
+          tax_exempt: CustomerDetails.TaxExempt | null;
+
+          /**
+           * The customer's tax IDs at time of checkout.
+           */
+          tax_ids: Array<CustomerDetails.TaxId> | null;
+        }
+
+        namespace CustomerDetails {
+          type TaxExempt = 'exempt' | 'none' | 'reverse';
+
+          interface TaxId {
+            /**
+             * The type of the tax ID, one of `eu_vat`, `br_cnpj`, `br_cpf`, `gb_vat`, `nz_gst`, `au_abn`, `in_gst`, `no_vat`, `za_vat`, `ch_vat`, `mx_rfc`, `sg_uen`, `ru_inn`, `ru_kpp`, `ca_bn`, `hk_br`, `es_cif`, `tw_vat`, `th_vat`, `jp_cn`, `jp_rn`, `li_uid`, `my_itn`, `us_ein`, `kr_brn`, `ca_qst`, `ca_gst_hst`, `ca_pst_bc`, `ca_pst_mb`, `ca_pst_sk`, `my_sst`, `sg_gst`, `ae_trn`, `cl_tin`, `sa_vat`, `id_npwp`, `my_frp`, or `unknown`
+             */
+            type: TaxId.Type;
+
+            /**
+             * The value of the tax ID.
+             */
+            value: string | null;
+          }
+
+          namespace TaxId {
+            type Type =
+              | 'ae_trn'
+              | 'au_abn'
+              | 'br_cnpj'
+              | 'br_cpf'
+              | 'ca_bn'
+              | 'ca_gst_hst'
+              | 'ca_pst_bc'
+              | 'ca_pst_mb'
+              | 'ca_pst_sk'
+              | 'ca_qst'
+              | 'ch_vat'
+              | 'cl_tin'
+              | 'es_cif'
+              | 'eu_vat'
+              | 'gb_vat'
+              | 'hk_br'
+              | 'id_npwp'
+              | 'in_gst'
+              | 'jp_cn'
+              | 'jp_rn'
+              | 'kr_brn'
+              | 'li_uid'
+              | 'mx_rfc'
+              | 'my_frp'
+              | 'my_itn'
+              | 'my_sst'
+              | 'no_vat'
+              | 'nz_gst'
+              | 'ru_inn'
+              | 'ru_kpp'
+              | 'sa_vat'
+              | 'sg_gst'
+              | 'sg_uen'
+              | 'th_vat'
+              | 'tw_vat'
+              | 'unknown'
+              | 'us_ein'
+              | 'za_vat';
+          }
+        }
 
         type Locale =
           | 'auto'
@@ -191,12 +301,62 @@ declare module 'stripe' {
           | 'sk'
           | 'sl'
           | 'sv'
+          | 'th'
           | 'tr'
           | 'zh'
           | 'zh-HK'
           | 'zh-TW';
 
         type Mode = 'payment' | 'setup' | 'subscription';
+
+        interface PaymentMethodOptions {
+          acss_debit?: PaymentMethodOptions.AcssDebit;
+        }
+
+        namespace PaymentMethodOptions {
+          interface AcssDebit {
+            currency?: string;
+
+            mandate_options?: AcssDebit.MandateOptions;
+
+            /**
+             * Bank account verification method.
+             */
+            verification_method?: AcssDebit.VerificationMethod;
+          }
+
+          namespace AcssDebit {
+            interface MandateOptions {
+              /**
+               * A URL for custom mandate text
+               */
+              custom_mandate_url?: string;
+
+              /**
+               * Description of the interval. Only required if 'payment_schedule' parmeter is 'interval' or 'combined'.
+               */
+              interval_description: string | null;
+
+              /**
+               * Payment schedule for the mandate.
+               */
+              payment_schedule: MandateOptions.PaymentSchedule | null;
+
+              /**
+               * Transaction type of the mandate.
+               */
+              transaction_type: MandateOptions.TransactionType | null;
+            }
+
+            namespace MandateOptions {
+              type PaymentSchedule = 'combined' | 'interval' | 'sporadic';
+
+              type TransactionType = 'business' | 'personal';
+            }
+
+            type VerificationMethod = 'automatic' | 'instant' | 'microdeposits';
+          }
+        }
 
         type PaymentStatus = 'no_payment_required' | 'paid' | 'unpaid';
 
@@ -475,11 +635,23 @@ declare module 'stripe' {
 
         type SubmitType = 'auto' | 'book' | 'donate' | 'pay';
 
+        interface TaxIdCollection {
+          /**
+           * Indicates whether tax ID collection is enabled for the session
+           */
+          enabled: boolean;
+        }
+
         interface TotalDetails {
           /**
            * This is the sum of all the line item discounts.
            */
           amount_discount: number;
+
+          /**
+           * This is the sum of all the line item shipping amounts.
+           */
+          amount_shipping: number | null;
 
           /**
            * This is the sum of all the line item tax amounts.
@@ -543,18 +715,6 @@ declare module 'stripe' {
         cancel_url: string;
 
         /**
-         * A list of the types of payment methods (e.g., `card`) this Checkout Session can accept.
-         *
-         * Read more about the supported payment methods and their requirements in our [payment
-         * method details guide](https://stripe.com/docs/payments/checkout/payment-methods).
-         *
-         * If multiple payment methods are passed, Checkout will dynamically reorder them to
-         * prioritize the most relevant payment methods based on the customer's location and
-         * other characteristics.
-         */
-        payment_method_types: Array<SessionCreateParams.PaymentMethodType>;
-
-        /**
          * The URL to which Stripe should send customers when payment or setup
          * is complete.
          * If you'd like access to the Checkout Session for the successful
@@ -566,6 +726,8 @@ declare module 'stripe' {
          * Enables user redeemable promotion codes.
          */
         allow_promotion_codes?: boolean;
+
+        automatic_tax?: SessionCreateParams.AutomaticTax;
 
         /**
          * Specify whether Checkout should collect the customer's billing address.
@@ -580,13 +742,16 @@ declare module 'stripe' {
         client_reference_id?: string;
 
         /**
-         * ID of an existing customer, if one exists. The email stored on the
-         * customer will be used to prefill the email field on the Checkout page.
-         * If the customer changes their email on the Checkout page, the Customer
-         * object will be updated with the new email.
-         * If blank for Checkout Sessions in `payment` or `subscription` mode,
-         * Checkout will create a new customer object based on information
-         * provided during the payment flow.
+         * ID of an existing Customer, if one exists. In `payment` mode, the customer's most recent card
+         * payment method will be used to prefill the email, name, card details, and billing address
+         * on the Checkout page. In `subscription` mode, the customer's [default payment method](https://stripe.com/docs/api/customers/update#update_customer-invoice_settings-default_payment_method)
+         * will be used if it's a card, and otherwise the most recent card will be used. A valid billing address is required for Checkout to prefill the customer's card details.
+         *
+         * If the customer changes their email on the Checkout page, the Customer object will be updated with the new email.
+         *
+         * If blank for Checkout Sessions in `payment` or `subscription` mode, Checkout will create a new Customer object based on information provided during the payment flow.
+         *
+         * You can set [`payment_intent_data.setup_future_usage`](https://stripe.com/docs/api/checkout/sessions/create#create_checkout_session-payment_intent_data-setup_future_usage) to have Checkout automatically attach the payment method to the Customer you pass in for future reuse.
          */
         customer?: string;
 
@@ -600,6 +765,11 @@ declare module 'stripe' {
         customer_email?: string;
 
         /**
+         * Controls what fields on Customer can be updated by the Checkout Session. Can only be provided when `customer` is provided.
+         */
+        customer_update?: SessionCreateParams.CustomerUpdate;
+
+        /**
          * The coupon or promotion code to apply to this Session. Currently, only up to one may be specified.
          */
         discounts?: Array<SessionCreateParams.Discount>;
@@ -611,10 +781,10 @@ declare module 'stripe' {
 
         /**
          * A list of items the customer is purchasing. Use this parameter to pass one-time or recurring [Prices](https://stripe.com/docs/api/prices).
-         * One-time Prices in `subscription` mode will be on the initial invoice only.
          *
-         * There is a maximum of 100 line items, however it is recommended to
-         * consolidate line items if there are more than a few dozen.
+         * For `payment` mode, there is a maximum of 100 line items, however it is recommended to consolidate line items if there are more than a few dozen.
+         *
+         * For `subscription` mode, there is a maximum of 20 line items with recurring Prices and 20 line items with one-time Prices. Line items with one-time Prices in will be on the initial invoice only.
          */
         line_items?: Array<SessionCreateParams.LineItem>;
 
@@ -639,6 +809,23 @@ declare module 'stripe' {
         payment_intent_data?: SessionCreateParams.PaymentIntentData;
 
         /**
+         * Payment-method-specific configuration.
+         */
+        payment_method_options?: SessionCreateParams.PaymentMethodOptions;
+
+        /**
+         * A list of the types of payment methods (e.g., `card`) this Checkout Session can accept.
+         *
+         * Read more about the supported payment methods and their requirements in our [payment
+         * method details guide](https://stripe.com/docs/payments/checkout/payment-methods).
+         *
+         * If multiple payment methods are passed, Checkout will dynamically reorder them to
+         * prioritize the most relevant payment methods based on the customer's location and
+         * other characteristics.
+         */
+        payment_method_types?: Array<SessionCreateParams.PaymentMethodType>;
+
+        /**
          * A subset of parameters to be passed to SetupIntent creation for Checkout Sessions in `setup` mode.
          */
         setup_intent_data?: SessionCreateParams.SetupIntentData;
@@ -647,6 +834,11 @@ declare module 'stripe' {
          * When set, provides configuration for Checkout to collect a shipping address from a customer.
          */
         shipping_address_collection?: SessionCreateParams.ShippingAddressCollection;
+
+        /**
+         * The shipping rate to apply to this Session. Currently, only up to one may be specified
+         */
+        shipping_rates?: Array<string>;
 
         /**
          * Describes the type of transaction being performed by Checkout in order to customize
@@ -660,10 +852,49 @@ declare module 'stripe' {
          * A subset of parameters to be passed to subscription creation for Checkout Sessions in `subscription` mode.
          */
         subscription_data?: SessionCreateParams.SubscriptionData;
+
+        /**
+         * Controls tax ID collection settings for the session.
+         */
+        tax_id_collection?: SessionCreateParams.TaxIdCollection;
       }
 
       namespace SessionCreateParams {
+        interface AutomaticTax {
+          /**
+           * Set to true to enable automatic taxes.
+           */
+          enabled: boolean;
+        }
+
         type BillingAddressCollection = 'auto' | 'required';
+
+        interface CustomerUpdate {
+          /**
+           * Describes whether Checkout saves the billing address onto `customer.address`.
+           * To always collect a full billing address, use `billing_address_collection`. Defaults to `never`.
+           */
+          address?: CustomerUpdate.Address;
+
+          /**
+           * Describes whether Checkout saves the name onto `customer.name`. Defaults to `never`.
+           */
+          name?: CustomerUpdate.Name;
+
+          /**
+           * Describes whether Checkout saves shipping information onto `customer.shipping`.
+           * To collect shipping information, use `shipping_address_collection`. Defaults to `never`.
+           */
+          shipping?: CustomerUpdate.Shipping;
+        }
+
+        namespace CustomerUpdate {
+          type Address = 'auto' | 'never';
+
+          type Name = 'auto' | 'never';
+
+          type Shipping = 'auto' | 'never';
+        }
 
         interface Discount {
           /**
@@ -678,6 +909,11 @@ declare module 'stripe' {
         }
 
         interface LineItem {
+          /**
+           * When set, provides configuration for this item's quantity to be adjusted by the customer during Checkout.
+           */
+          adjustable_quantity?: LineItem.AdjustableQuantity;
+
           /**
            * The amount to be collected per unit of the line item. If specified, must also pass `currency` and `name`.
            */
@@ -694,6 +930,11 @@ declare module 'stripe' {
            * If using `price` or `price_data`, will default to the name of the associated product.
            */
           description?: string;
+
+          /**
+           * The [tax rates](https://stripe.com/docs/api/tax_rates) that will be applied to this line item depending on the customer's billing/shipping address. We currently support the following countries: US, GB, AU, and all countries in the EU.
+           */
+          dynamic_tax_rates?: Array<string>;
 
           /**
            * A list of image URLs representing this line item. Each image can be up to 5 MB in size. If passing `price` or `price_data`, specify images on the associated product instead.
@@ -716,17 +957,34 @@ declare module 'stripe' {
           price_data?: LineItem.PriceData;
 
           /**
-           * The quantity of the line item being purchased.
+           * The quantity of the line item being purchased. Quantity should not be defined when `recurring.usage_type=metered`.
            */
-          quantity: number;
+          quantity?: number;
 
           /**
-           * The [tax rates](https://stripe.com/docs/api/tax_rates) which apply to this line item. This is only allowed in subscription mode.
+           * The [tax rates](https://stripe.com/docs/api/tax_rates) which apply to this line item.
            */
           tax_rates?: Array<string>;
         }
 
         namespace LineItem {
+          interface AdjustableQuantity {
+            /**
+             * Set to true if the quantity can be adjusted to any non-negative integer. By default customers will be able to remove the line item by setting the quantity to 0.
+             */
+            enabled: boolean;
+
+            /**
+             * The maximum quantity the customer can purchase for the Checkout Session. By default this value is 99.
+             */
+            maximum?: number;
+
+            /**
+             * The minimum quantity the customer must purchase for the Checkout Session. By default this value is 0.
+             */
+            minimum?: number;
+          }
+
           interface PriceData {
             /**
              * Three-letter [ISO currency code](https://www.iso.org/iso-4217-currency-codes.html), in lowercase. Must be a [supported currency](https://stripe.com/docs/currencies).
@@ -747,6 +1005,11 @@ declare module 'stripe' {
              * The recurring components of a price such as `interval` and `usage_type`.
              */
             recurring?: PriceData.Recurring;
+
+            /**
+             * Specifies whether the price is considered inclusive of taxes or exclusive of taxes. One of `inclusive`, `exclusive`, or `unspecified`. Once specified as either `inclusive` or `exclusive`, it cannot be changed.
+             */
+            tax_behavior?: PriceData.TaxBehavior;
 
             /**
              * A non-negative integer in %s representing how much to charge. One of `unit_amount` or `unit_amount_decimal` is required.
@@ -780,6 +1043,11 @@ declare module 'stripe' {
                * The product's name, meant to be displayable to the customer. Whenever this product is sold via a subscription, name will show up on associated invoice line item descriptions.
                */
               name: string;
+
+              /**
+               * A [tax code](https://stripe.com/docs/tax/tax-codes) ID.
+               */
+              tax_code?: string;
             }
 
             interface Recurring {
@@ -797,6 +1065,8 @@ declare module 'stripe' {
             namespace Recurring {
               type Interval = 'day' | 'month' | 'week' | 'year';
             }
+
+            type TaxBehavior = 'exclusive' | 'inclusive' | 'unspecified';
           }
         }
 
@@ -833,6 +1103,7 @@ declare module 'stripe' {
           | 'sk'
           | 'sl'
           | 'sv'
+          | 'th'
           | 'tr'
           | 'zh'
           | 'zh-HK'
@@ -878,12 +1149,19 @@ declare module 'stripe' {
           receipt_email?: string;
 
           /**
-           * Indicates that you intend to make future payments with the payment
+           * Indicates that you intend to [make future payments](https://stripe.com/docs/payments/payment-intents#future-usage) with the payment
            * method collected by this Checkout Session.
+           *
+           * When setting this to `on_session`, Checkout will show a notice to the
+           * customer that their payment details will be saved.
            *
            * When setting this to `off_session`, Checkout will show a notice to the
            * customer that their payment details will be saved and used for future
            * payments.
+           *
+           * For both values, Checkout will attach the payment method to either the
+           * provided Customer for the session, or a new Customer created by Checkout
+           * if one has not been provided.
            *
            * When processing card payments, Checkout also uses `setup_future_usage`
            * to dynamically optimize your payment flow and comply with regional
@@ -969,7 +1247,71 @@ declare module 'stripe' {
           }
         }
 
+        interface PaymentMethodOptions {
+          /**
+           * contains details about the ACSS Debit payment method options.
+           */
+          acss_debit?: PaymentMethodOptions.AcssDebit;
+        }
+
+        namespace PaymentMethodOptions {
+          interface AcssDebit {
+            /**
+             * Three-letter [ISO currency code](https://www.iso.org/iso-4217-currency-codes.html), in lowercase. Must be a [supported currency](https://stripe.com/docs/currencies). This is only accepted for Checkout Sessions in `setup` mode.
+             */
+            currency?: AcssDebit.Currency;
+
+            /**
+             * Additional fields for Mandate creation
+             */
+            mandate_options?: AcssDebit.MandateOptions;
+
+            /**
+             * Verification method for the intent
+             */
+            verification_method?: AcssDebit.VerificationMethod;
+          }
+
+          namespace AcssDebit {
+            type Currency = 'cad' | 'usd';
+
+            interface MandateOptions {
+              /**
+               * A URL for custom mandate text to render during confirmation step.
+               * The URL will be rendered with additional GET parameters `payment_intent` and `payment_intent_client_secret` when confirming a Payment Intent,
+               * or `setup_intent` and `setup_intent_client_secret` when confirming a Setup Intent.
+               */
+              custom_mandate_url?: Stripe.Emptyable<string>;
+
+              /**
+               * Description of the mandate interval. Only required if 'payment_schedule' parameter is 'interval' or 'combined'.
+               */
+              interval_description?: string;
+
+              /**
+               * Payment schedule for the mandate.
+               */
+              payment_schedule?: MandateOptions.PaymentSchedule;
+
+              /**
+               * Transaction type of the mandate.
+               */
+              transaction_type?: MandateOptions.TransactionType;
+            }
+
+            namespace MandateOptions {
+              type PaymentSchedule = 'combined' | 'interval' | 'sporadic';
+
+              type TransactionType = 'business' | 'personal';
+            }
+
+            type VerificationMethod = 'automatic' | 'instant' | 'microdeposits';
+          }
+        }
+
         type PaymentMethodType =
+          | 'acss_debit'
+          | 'afterpay_clearpay'
           | 'alipay'
           | 'bacs_debit'
           | 'bancontact'
@@ -1280,6 +1622,11 @@ declare module 'stripe' {
           metadata?: Stripe.MetadataParam;
 
           /**
+           * If specified, the funds from the subscription's invoices will be transferred to the destination and the ID of the resulting transfers will be found on the resulting charges.
+           */
+          transfer_data?: SubscriptionData.TransferData;
+
+          /**
            * Unix timestamp representing the end of the trial period the customer
            * will get before being charged for the first time. Has to be at least
            * 48 hours in the future.
@@ -1306,7 +1653,7 @@ declare module 'stripe' {
             plan: string;
 
             /**
-             * Quantity for this item.
+             * The quantity of the subscription item being purchased. Quantity should not be defined when `recurring.usage_type=metered`.
              */
             quantity?: number;
 
@@ -1316,6 +1663,25 @@ declare module 'stripe' {
              */
             tax_rates?: Array<string>;
           }
+
+          interface TransferData {
+            /**
+             * A non-negative decimal between 0 and 100, with at most two decimal places. This represents the percentage of the subscription invoice subtotal that will be transferred to the destination account. By default, the entire amount is transferred to the destination.
+             */
+            amount_percent?: number;
+
+            /**
+             * ID of an existing, connected Stripe account.
+             */
+            destination: string;
+          }
+        }
+
+        interface TaxIdCollection {
+          /**
+           * Set to true to enable Tax ID collection.
+           */
+          enabled: boolean;
         }
       }
 

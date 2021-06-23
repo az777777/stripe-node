@@ -29,7 +29,7 @@ declare module 'stripe' {
       /**
        * The account tax IDs associated with the invoice. Only editable when the invoice is a draft.
        */
-      account_tax_ids?: Array<
+      account_tax_ids: Array<
         string | Stripe.TaxId | Stripe.DeletedTaxId
       > | null;
 
@@ -68,6 +68,8 @@ declare module 'stripe' {
        */
       auto_advance?: boolean;
 
+      automatic_tax: Invoice.AutomaticTax;
+
       /**
        * Indicates the reason why the invoice was created. `subscription_cycle` indicates an invoice created by a subscription advancing into a new period. `subscription_create` indicates an invoice created due to creating a subscription. `subscription_update` indicates an invoice created due to updating a subscription. `subscription` is set for all old invoices to indicate either a change to a subscription or a period advancement. `manual` is set for all invoices unrelated to a subscription (for example: created via the invoice editor). The `upcoming` value is reserved for simulated invoices per the upcoming invoice endpoint. `subscription_threshold` indicates an invoice created due to a billing threshold being reached.
        */
@@ -101,7 +103,7 @@ declare module 'stripe' {
       /**
        * The ID of the customer who will be billed.
        */
-      customer: string | Stripe.Customer | Stripe.DeletedCustomer;
+      customer: string | Stripe.Customer | Stripe.DeletedCustomer | null;
 
       /**
        * The customer's address. Until the invoice is finalized, this field will equal `customer.address`. Once the invoice is finalized, this field will no longer be updated.
@@ -200,7 +202,7 @@ declare module 'stripe' {
       /**
        * The error encountered during the previous attempt to finalize the invoice. This field is cleared when the invoice is successfully finalized.
        */
-      last_finalization_error?: Invoice.LastFinalizationError | null;
+      last_finalization_error: Invoice.LastFinalizationError | null;
 
       /**
        * The individual line items that make up the invoice. `lines` is sorted as follows: invoice items in reverse chronological order, followed by the subscription, if any.
@@ -228,6 +230,11 @@ declare module 'stripe' {
       number: string | null;
 
       /**
+       * The account (if any) for which the funds of the invoice payment are intended. If set, the invoice will be presented with the branding and support information of the specified account. See the [Invoices with Connect](https://stripe.com/docs/billing/invoices/connect) documentation for details.
+       */
+      on_behalf_of: string | Stripe.Account | null;
+
+      /**
        * Whether payment was successfully collected for this invoice. An invoice can be paid (most commonly) with a charge or with credit from the customer's account balance.
        */
       paid: boolean;
@@ -236,6 +243,8 @@ declare module 'stripe' {
        * The PaymentIntent associated with this invoice. The PaymentIntent is generated when the invoice is finalized, and can then be used to pay the invoice. Note that voiding an invoice will cancel the PaymentIntent.
        */
       payment_intent: string | Stripe.PaymentIntent | null;
+
+      payment_settings: Invoice.PaymentSettings;
 
       /**
        * End of the usage period during which invoice items were added to this invoice.
@@ -328,6 +337,22 @@ declare module 'stripe' {
     }
 
     namespace Invoice {
+      interface AutomaticTax {
+        /**
+         * Whether Stripe automatically computes tax on this invoice.
+         */
+        enabled: boolean;
+
+        /**
+         * The status of the most recent automated tax calculation for this invoice.
+         */
+        status: AutomaticTax.Status | null;
+      }
+
+      namespace AutomaticTax {
+        type Status = 'complete' | 'failed' | 'requires_location_inputs';
+      }
+
       type BillingReason =
         | 'automatic_pending_invoice_item_invoice'
         | 'manual'
@@ -368,7 +393,7 @@ declare module 'stripe' {
 
       interface CustomerTaxId {
         /**
-         * The type of the tax ID, one of `eu_vat`, `br_cnpj`, `br_cpf`, `nz_gst`, `au_abn`, `in_gst`, `no_vat`, `za_vat`, `ch_vat`, `mx_rfc`, `sg_uen`, `ru_inn`, `ru_kpp`, `ca_bn`, `hk_br`, `es_cif`, `tw_vat`, `th_vat`, `jp_cn`, `jp_rn`, `li_uid`, `my_itn`, `us_ein`, `kr_brn`, `ca_qst`, `my_sst`, `sg_gst`, `ae_trn`, `cl_tin`, `sa_vat`, `id_npwp`, `my_frp`, or `unknown`
+         * The type of the tax ID, one of `eu_vat`, `br_cnpj`, `br_cpf`, `gb_vat`, `nz_gst`, `au_abn`, `in_gst`, `no_vat`, `za_vat`, `ch_vat`, `mx_rfc`, `sg_uen`, `ru_inn`, `ru_kpp`, `ca_bn`, `hk_br`, `es_cif`, `tw_vat`, `th_vat`, `jp_cn`, `jp_rn`, `li_uid`, `my_itn`, `us_ein`, `kr_brn`, `ca_qst`, `ca_gst_hst`, `ca_pst_bc`, `ca_pst_mb`, `ca_pst_sk`, `my_sst`, `sg_gst`, `ae_trn`, `cl_tin`, `sa_vat`, `id_npwp`, `my_frp`, or `unknown`
          */
         type: CustomerTaxId.Type;
 
@@ -385,11 +410,16 @@ declare module 'stripe' {
           | 'br_cnpj'
           | 'br_cpf'
           | 'ca_bn'
+          | 'ca_gst_hst'
+          | 'ca_pst_bc'
+          | 'ca_pst_mb'
+          | 'ca_pst_sk'
           | 'ca_qst'
           | 'ch_vat'
           | 'cl_tin'
           | 'es_cif'
           | 'eu_vat'
+          | 'gb_vat'
           | 'hk_br'
           | 'id_npwp'
           | 'in_gst'
@@ -532,6 +562,70 @@ declare module 'stripe' {
           | 'rate_limit_error';
       }
 
+      interface PaymentSettings {
+        /**
+         * Payment-method-specific configuration to provide to the invoice's PaymentIntent.
+         */
+        payment_method_options: PaymentSettings.PaymentMethodOptions | null;
+
+        /**
+         * The list of payment method types (e.g. card) to provide to the invoice's PaymentIntent. If not set, Stripe attempts to automatically determine the types to use by looking at the invoice's default payment method, the subscription's default payment method, the customer's default payment method, and your [invoice template settings](https://dashboard.stripe.com/settings/billing/invoice).
+         */
+        payment_method_types: Array<PaymentSettings.PaymentMethodType> | null;
+      }
+
+      namespace PaymentSettings {
+        interface PaymentMethodOptions {
+          /**
+           * If paying by `bancontact`, this sub-hash contains details about the Bancontact payment method options to pass to the invoice's PaymentIntent.
+           */
+          bancontact: PaymentMethodOptions.Bancontact | null;
+
+          /**
+           * If paying by `card`, this sub-hash contains details about the Card payment method options to pass to the invoice's PaymentIntent.
+           */
+          card: PaymentMethodOptions.Card | null;
+        }
+
+        namespace PaymentMethodOptions {
+          interface Bancontact {
+            /**
+             * Preferred language of the Bancontact authorization page that the customer is redirected to.
+             */
+            preferred_language: Bancontact.PreferredLanguage;
+          }
+
+          namespace Bancontact {
+            type PreferredLanguage = 'de' | 'en' | 'fr' | 'nl';
+          }
+
+          interface Card {
+            /**
+             * We strongly recommend that you rely on our SCA Engine to automatically prompt your customers for authentication based on risk level and [other requirements](https://stripe.com/docs/strong-customer-authentication). However, if you wish to request 3D Secure based on logic from your own fraud engine, provide this option. Read our guide on [manually requesting 3D Secure](https://stripe.com/docs/payments/3d-secure#manual-three-ds) for more information on how this configuration interacts with Radar and our SCA Engine.
+             */
+            request_three_d_secure: Card.RequestThreeDSecure | null;
+          }
+
+          namespace Card {
+            type RequestThreeDSecure = 'any' | 'automatic';
+          }
+        }
+
+        type PaymentMethodType =
+          | 'ach_credit_transfer'
+          | 'ach_debit'
+          | 'au_becs_debit'
+          | 'bacs_debit'
+          | 'bancontact'
+          | 'card'
+          | 'fpx'
+          | 'giropay'
+          | 'ideal'
+          | 'sepa_credit_transfer'
+          | 'sepa_debit'
+          | 'sofort';
+      }
+
       type Status =
         | 'deleted'
         | 'draft'
@@ -672,6 +766,11 @@ declare module 'stripe' {
       auto_advance?: boolean;
 
       /**
+       * Settings for automatic tax lookup for this invoice.
+       */
+      automatic_tax?: InvoiceCreateParams.AutomaticTax;
+
+      /**
        * Either `charge_automatically`, or `send_invoice`. When charging automatically, Stripe will attempt to pay this invoice using the default source attached to the customer. When sending an invoice, Stripe will email this invoice to the customer with payment instructions. Defaults to `charge_automatically`.
        */
       collection_method?: InvoiceCreateParams.CollectionMethod;
@@ -732,6 +831,16 @@ declare module 'stripe' {
       metadata?: Stripe.Emptyable<Stripe.MetadataParam>;
 
       /**
+       * The account (if any) for which the funds of the invoice payment are intended. If set, the invoice will be presented with the branding and support information of the specified account. See the [Invoices with Connect](https://stripe.com/docs/billing/invoices/connect) documentation for details.
+       */
+      on_behalf_of?: string;
+
+      /**
+       * Configuration settings for the PaymentIntent that is generated when the invoice is finalized.
+       */
+      payment_settings?: InvoiceCreateParams.PaymentSettings;
+
+      /**
        * Extra information about a charge for the customer's credit card statement. It must contain at least one letter. If not specified and this invoice is part of a subscription, the default `statement_descriptor` will be set to the first subscription item's product's `statement_descriptor`.
        */
       statement_descriptor?: string;
@@ -748,6 +857,13 @@ declare module 'stripe' {
     }
 
     namespace InvoiceCreateParams {
+      interface AutomaticTax {
+        /**
+         * Controls whether Stripe will automatically compute tax on this invoice.
+         */
+        enabled: boolean;
+      }
+
       type CollectionMethod = 'charge_automatically' | 'send_invoice';
 
       interface CustomField {
@@ -772,6 +888,72 @@ declare module 'stripe' {
          * ID of an existing discount on the object (or one of its ancestors) to reuse.
          */
         discount?: string;
+      }
+
+      interface PaymentSettings {
+        /**
+         * Payment-method-specific configuration to provide to the invoice's PaymentIntent.
+         */
+        payment_method_options?: PaymentSettings.PaymentMethodOptions;
+
+        /**
+         * The list of payment method types (e.g. card) to provide to the invoice's PaymentIntent. If not set, Stripe attempts to automatically determine the types to use by looking at the invoice's default payment method, the subscription's default payment method, the customer's default payment method, and your [invoice template settings](https://dashboard.stripe.com/settings/billing/invoice).
+         */
+        payment_method_types?: Stripe.Emptyable<
+          Array<PaymentSettings.PaymentMethodType>
+        >;
+      }
+
+      namespace PaymentSettings {
+        interface PaymentMethodOptions {
+          /**
+           * If paying by `bancontact`, this sub-hash contains details about the Bancontact payment method options to pass to the invoice's PaymentIntent.
+           */
+          bancontact?: Stripe.Emptyable<PaymentMethodOptions.Bancontact>;
+
+          /**
+           * If paying by `card`, this sub-hash contains details about the Card payment method options to pass to the invoice's PaymentIntent.
+           */
+          card?: Stripe.Emptyable<PaymentMethodOptions.Card>;
+        }
+
+        namespace PaymentMethodOptions {
+          interface Bancontact {
+            /**
+             * Preferred language of the Bancontact authorization page that the customer is redirected to.
+             */
+            preferred_language?: Bancontact.PreferredLanguage;
+          }
+
+          namespace Bancontact {
+            type PreferredLanguage = 'de' | 'en' | 'fr' | 'nl';
+          }
+
+          interface Card {
+            /**
+             * We strongly recommend that you rely on our SCA Engine to automatically prompt your customers for authentication based on risk level and [other requirements](https://stripe.com/docs/strong-customer-authentication). However, if you wish to request 3D Secure based on logic from your own fraud engine, provide this option. Read our guide on [manually requesting 3D Secure](https://stripe.com/docs/payments/3d-secure#manual-three-ds) for more information on how this configuration interacts with Radar and our SCA Engine.
+             */
+            request_three_d_secure?: Card.RequestThreeDSecure;
+          }
+
+          namespace Card {
+            type RequestThreeDSecure = 'any' | 'automatic';
+          }
+        }
+
+        type PaymentMethodType =
+          | 'ach_credit_transfer'
+          | 'ach_debit'
+          | 'au_becs_debit'
+          | 'bacs_debit'
+          | 'bancontact'
+          | 'card'
+          | 'fpx'
+          | 'giropay'
+          | 'ideal'
+          | 'sepa_credit_transfer'
+          | 'sepa_debit'
+          | 'sofort';
       }
 
       interface TransferData {
@@ -809,6 +991,11 @@ declare module 'stripe' {
        * Controls whether Stripe will perform [automatic collection](https://stripe.com/docs/billing/invoices/workflow/#auto_advance) of the invoice.
        */
       auto_advance?: boolean;
+
+      /**
+       * Settings for automatic tax lookup for this invoice.
+       */
+      automatic_tax?: InvoiceUpdateParams.AutomaticTax;
 
       /**
        * Either `charge_automatically` or `send_invoice`. This field can be updated only on `draft` invoices.
@@ -871,6 +1058,16 @@ declare module 'stripe' {
       metadata?: Stripe.Emptyable<Stripe.MetadataParam>;
 
       /**
+       * The account (if any) for which the funds of the invoice payment are intended. If set, the invoice will be presented with the branding and support information of the specified account. See the [Invoices with Connect](https://stripe.com/docs/billing/invoices/connect) documentation for details.
+       */
+      on_behalf_of?: Stripe.Emptyable<string>;
+
+      /**
+       * Configuration settings for the PaymentIntent that is generated when the invoice is finalized.
+       */
+      payment_settings?: InvoiceUpdateParams.PaymentSettings;
+
+      /**
        * Extra information about a charge for the customer's credit card statement. It must contain at least one letter. If not specified and this invoice is part of a subscription, the default `statement_descriptor` will be set to the first subscription item's product's `statement_descriptor`.
        */
       statement_descriptor?: string;
@@ -882,6 +1079,13 @@ declare module 'stripe' {
     }
 
     namespace InvoiceUpdateParams {
+      interface AutomaticTax {
+        /**
+         * Controls whether Stripe will automatically compute tax on this invoice.
+         */
+        enabled: boolean;
+      }
+
       type CollectionMethod = 'charge_automatically' | 'send_invoice';
 
       interface CustomField {
@@ -906,6 +1110,72 @@ declare module 'stripe' {
          * ID of an existing discount on the object (or one of its ancestors) to reuse.
          */
         discount?: string;
+      }
+
+      interface PaymentSettings {
+        /**
+         * Payment-method-specific configuration to provide to the invoice's PaymentIntent.
+         */
+        payment_method_options?: PaymentSettings.PaymentMethodOptions;
+
+        /**
+         * The list of payment method types (e.g. card) to provide to the invoice's PaymentIntent. If not set, Stripe attempts to automatically determine the types to use by looking at the invoice's default payment method, the subscription's default payment method, the customer's default payment method, and your [invoice template settings](https://dashboard.stripe.com/settings/billing/invoice).
+         */
+        payment_method_types?: Stripe.Emptyable<
+          Array<PaymentSettings.PaymentMethodType>
+        >;
+      }
+
+      namespace PaymentSettings {
+        interface PaymentMethodOptions {
+          /**
+           * If paying by `bancontact`, this sub-hash contains details about the Bancontact payment method options to pass to the invoice's PaymentIntent.
+           */
+          bancontact?: Stripe.Emptyable<PaymentMethodOptions.Bancontact>;
+
+          /**
+           * If paying by `card`, this sub-hash contains details about the Card payment method options to pass to the invoice's PaymentIntent.
+           */
+          card?: Stripe.Emptyable<PaymentMethodOptions.Card>;
+        }
+
+        namespace PaymentMethodOptions {
+          interface Bancontact {
+            /**
+             * Preferred language of the Bancontact authorization page that the customer is redirected to.
+             */
+            preferred_language?: Bancontact.PreferredLanguage;
+          }
+
+          namespace Bancontact {
+            type PreferredLanguage = 'de' | 'en' | 'fr' | 'nl';
+          }
+
+          interface Card {
+            /**
+             * We strongly recommend that you rely on our SCA Engine to automatically prompt your customers for authentication based on risk level and [other requirements](https://stripe.com/docs/strong-customer-authentication). However, if you wish to request 3D Secure based on logic from your own fraud engine, provide this option. Read our guide on [manually requesting 3D Secure](https://stripe.com/docs/payments/3d-secure#manual-three-ds) for more information on how this configuration interacts with Radar and our SCA Engine.
+             */
+            request_three_d_secure?: Card.RequestThreeDSecure;
+          }
+
+          namespace Card {
+            type RequestThreeDSecure = 'any' | 'automatic';
+          }
+        }
+
+        type PaymentMethodType =
+          | 'ach_credit_transfer'
+          | 'ach_debit'
+          | 'au_becs_debit'
+          | 'bacs_debit'
+          | 'bancontact'
+          | 'card'
+          | 'fpx'
+          | 'giropay'
+          | 'ideal'
+          | 'sepa_credit_transfer'
+          | 'sepa_debit'
+          | 'sofort';
       }
 
       interface TransferData {
@@ -962,7 +1232,7 @@ declare module 'stripe' {
 
     interface InvoiceFinalizeInvoiceParams {
       /**
-       * Controls whether Stripe will perform [automatic collection](https://stripe.com/docs/billing/invoices/workflow/#auto_advance) of the invoice. When `false`, the invoice's state will not automatically advance without an explicit action.
+       * Controls whether Stripe will perform [automatic collection](https://stripe.com/docs/billing/invoices/overview#auto-advance) of the invoice. When `false`, the invoice's state will not automatically advance without an explicit action.
        */
       auto_advance?: boolean;
 
@@ -1015,6 +1285,11 @@ declare module 'stripe' {
 
     interface InvoiceRetrieveUpcomingParams {
       /**
+       * Settings for automatic tax lookup for this invoice preview.
+       */
+      automatic_tax?: InvoiceRetrieveUpcomingParams.AutomaticTax;
+
+      /**
        * The code of the coupon to apply. If `subscription` or `subscription_items` is provided, the invoice returned will preview updating or creating a subscription with that coupon. Otherwise, it will preview applying that coupon to the customer for the next upcoming invoice from among the customer's subscriptions. The invoice can be previewed without a coupon by passing this value as an empty string.
        */
       coupon?: string;
@@ -1025,7 +1300,12 @@ declare module 'stripe' {
       customer?: string;
 
       /**
-       * The coupons to redeem into discounts for the invoice preview. If not specified, inherits the discount from the customer or subscription. Pass an empty string to avoid inheriting any discounts.
+       * Details about the customer you want to invoice
+       */
+      customer_details?: InvoiceRetrieveUpcomingParams.CustomerDetails;
+
+      /**
+       * The coupons to redeem into discounts for the invoice preview. If not specified, inherits the discount from the customer or subscription. Pass an empty string to avoid inheriting any discounts. To preview the upcoming invoice for a subscription that hasn't been created, use `coupon` instead.
        */
       discounts?: Stripe.Emptyable<
         Array<InvoiceRetrieveUpcomingParams.Discount>
@@ -1116,6 +1396,153 @@ declare module 'stripe' {
     }
 
     namespace InvoiceRetrieveUpcomingParams {
+      interface AutomaticTax {
+        /**
+         * Controls whether Stripe will automatically compute tax on this invoice.
+         */
+        enabled: boolean;
+      }
+
+      interface CustomerDetails {
+        /**
+         * The customer's address.
+         */
+        address?: Stripe.Emptyable<CustomerDetails.Address>;
+
+        /**
+         * The customer's shipping information. Appears on invoices emailed to this customer.
+         */
+        shipping?: Stripe.Emptyable<CustomerDetails.Shipping>;
+
+        /**
+         * Tax details about the customer.
+         */
+        tax?: CustomerDetails.Tax;
+
+        /**
+         * The customer's tax exemption. One of `none`, `exempt`, or `reverse`.
+         */
+        tax_exempt?: Stripe.Emptyable<CustomerDetails.TaxExempt>;
+
+        /**
+         * The customer's tax IDs.
+         */
+        tax_ids?: Array<CustomerDetails.TaxId>;
+      }
+
+      namespace CustomerDetails {
+        interface Address {
+          /**
+           * City, district, suburb, town, or village.
+           */
+          city?: string;
+
+          /**
+           * Two-letter country code ([ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)).
+           */
+          country?: string;
+
+          /**
+           * Address line 1 (e.g., street, PO Box, or company name).
+           */
+          line1?: string;
+
+          /**
+           * Address line 2 (e.g., apartment, suite, unit, or building).
+           */
+          line2?: string;
+
+          /**
+           * ZIP or postal code.
+           */
+          postal_code?: string;
+
+          /**
+           * State, county, province, or region.
+           */
+          state?: string;
+        }
+
+        interface Shipping {
+          /**
+           * Customer shipping address.
+           */
+          address: Stripe.AddressParam;
+
+          /**
+           * Customer name.
+           */
+          name: string;
+
+          /**
+           * Customer phone (including extension).
+           */
+          phone?: string;
+        }
+
+        interface Tax {
+          /**
+           * A recent IP address of the customer used for tax reporting and tax location inference. Stripe recommends updating the IP address when a new PaymentMethod is attached or the address field on the customer is updated. We recommend against updating this field more frequently since it could result in unexpected tax location/reporting outcomes.
+           */
+          ip_address?: Stripe.Emptyable<string>;
+        }
+
+        type TaxExempt = 'exempt' | 'none' | 'reverse';
+
+        interface TaxId {
+          /**
+           * Type of the tax ID, one of `ae_trn`, `au_abn`, `br_cnpj`, `br_cpf`, `ca_bn`, `ca_gst_hst`, `ca_pst_bc`, `ca_pst_mb`, `ca_pst_sk`, `ca_qst`, `ch_vat`, `cl_tin`, `es_cif`, `eu_vat`, `gb_vat`, `hk_br`, `id_npwp`, `in_gst`, `jp_cn`, `jp_rn`, `kr_brn`, `li_uid`, `mx_rfc`, `my_frp`, `my_itn`, `my_sst`, `no_vat`, `nz_gst`, `ru_inn`, `ru_kpp`, `sa_vat`, `sg_gst`, `sg_uen`, `th_vat`, `tw_vat`, `us_ein`, or `za_vat`
+           */
+          type: TaxId.Type;
+
+          /**
+           * Value of the tax ID.
+           */
+          value: string;
+        }
+
+        namespace TaxId {
+          type Type =
+            | 'ae_trn'
+            | 'au_abn'
+            | 'br_cnpj'
+            | 'br_cpf'
+            | 'ca_bn'
+            | 'ca_gst_hst'
+            | 'ca_pst_bc'
+            | 'ca_pst_mb'
+            | 'ca_pst_sk'
+            | 'ca_qst'
+            | 'ch_vat'
+            | 'cl_tin'
+            | 'es_cif'
+            | 'eu_vat'
+            | 'gb_vat'
+            | 'hk_br'
+            | 'id_npwp'
+            | 'in_gst'
+            | 'jp_cn'
+            | 'jp_rn'
+            | 'kr_brn'
+            | 'li_uid'
+            | 'mx_rfc'
+            | 'my_frp'
+            | 'my_itn'
+            | 'my_sst'
+            | 'no_vat'
+            | 'nz_gst'
+            | 'ru_inn'
+            | 'ru_kpp'
+            | 'sa_vat'
+            | 'sg_gst'
+            | 'sg_uen'
+            | 'th_vat'
+            | 'tw_vat'
+            | 'us_ein'
+            | 'za_vat';
+        }
+      }
+
       interface Discount {
         /**
          * ID of the coupon to create a new discount for.
@@ -1237,6 +1664,11 @@ declare module 'stripe' {
           product: string;
 
           /**
+           * Specifies whether the price is considered inclusive of taxes or exclusive of taxes. One of `inclusive`, `exclusive`, or `unspecified`. Once specified as either `inclusive` or `exclusive`, it cannot be changed.
+           */
+          tax_behavior?: PriceData.TaxBehavior;
+
+          /**
            * A positive integer in %s (or 0 for a free price) representing how much to charge.
            */
           unit_amount?: number;
@@ -1245,6 +1677,10 @@ declare module 'stripe' {
            * Same as `unit_amount`, but accepts a decimal value in %s with at most 12 decimal places. Only one of `unit_amount` and `unit_amount_decimal` can be set.
            */
           unit_amount_decimal?: string;
+        }
+
+        namespace PriceData {
+          type TaxBehavior = 'exclusive' | 'inclusive' | 'unspecified';
         }
       }
 
@@ -1329,6 +1765,11 @@ declare module 'stripe' {
           recurring: PriceData.Recurring;
 
           /**
+           * Specifies whether the price is considered inclusive of taxes or exclusive of taxes. One of `inclusive`, `exclusive`, or `unspecified`. Once specified as either `inclusive` or `exclusive`, it cannot be changed.
+           */
+          tax_behavior?: PriceData.TaxBehavior;
+
+          /**
            * A positive integer in %s (or 0 for a free price) representing how much to charge.
            */
           unit_amount?: number;
@@ -1355,6 +1796,8 @@ declare module 'stripe' {
           namespace Recurring {
             type Interval = 'day' | 'month' | 'week' | 'year';
           }
+
+          type TaxBehavior = 'exclusive' | 'inclusive' | 'unspecified';
         }
       }
 

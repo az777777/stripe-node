@@ -247,10 +247,13 @@ declare module 'stripe' {
           }
 
           type Structure =
+            | 'free_zone_establishment'
+            | 'free_zone_llc'
             | 'government_instrumentality'
             | 'governmental_unit'
             | 'incorporated_non_profit'
             | 'limited_liability_partnership'
+            | 'llc'
             | 'multi_member_llc'
             | 'private_company'
             | 'private_corporation'
@@ -258,6 +261,8 @@ declare module 'stripe' {
             | 'public_company'
             | 'public_corporation'
             | 'public_partnership'
+            | 'single_member_llc'
+            | 'sole_establishment'
             | 'sole_proprietorship'
             | 'tax_exempt_government_instrumentality'
             | 'unincorporated_association'
@@ -565,6 +570,11 @@ declare module 'stripe' {
         dob?: Stripe.Emptyable<Person.Dob>;
 
         /**
+         * Documents that may be submitted to satisfy various informational requests.
+         */
+        documents?: Person.Documents;
+
+        /**
          * The person's email address.
          */
         email?: string;
@@ -618,6 +628,11 @@ declare module 'stripe' {
          * Set of [key-value pairs](https://stripe.com/docs/api/metadata) that you can attach to an object. This can be useful for storing additional information about the object in a structured format. Individual keys can be unset by posting an empty value to them. All keys can be unset by posting an empty value to `metadata`.
          */
         metadata?: Stripe.Emptyable<Stripe.MetadataParam>;
+
+        /**
+         * The country where the person is a national. Two-letter country code ([ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)), or "XX" if unavailable.
+         */
+        nationality?: string;
 
         /**
          * The person's phone number.
@@ -693,6 +708,46 @@ declare module 'stripe' {
            * The four-digit year of birth.
            */
           year: number;
+        }
+
+        interface Documents {
+          /**
+           * One or more documents that demonstrate proof that this person is authorized to represent the company.
+           */
+          company_authorization?: Documents.CompanyAuthorization;
+
+          /**
+           * One or more documents showing the person's passport page with photo and personal data.
+           */
+          passport?: Documents.Passport;
+
+          /**
+           * One or more documents showing the person's visa required for living in the country where they are residing.
+           */
+          visa?: Documents.Visa;
+        }
+
+        namespace Documents {
+          interface CompanyAuthorization {
+            /**
+             * One or more document ids returned by a [file upload](https://stripe.com/docs/api#create_file) with a `purpose` value of `account_requirement`.
+             */
+            files?: Array<string>;
+          }
+
+          interface Passport {
+            /**
+             * One or more document ids returned by a [file upload](https://stripe.com/docs/api#create_file) with a `purpose` value of `account_requirement`.
+             */
+            files?: Array<string>;
+          }
+
+          interface Visa {
+            /**
+             * One or more document ids returned by a [file upload](https://stripe.com/docs/api#create_file) with a `purpose` value of `account_requirement`.
+             */
+            files?: Array<string>;
+          }
         }
 
         interface Relationship {
